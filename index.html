@@ -56,16 +56,25 @@
     .income { color: #34d399; font-size: 11px; font-weight: 600; }
     .life { color: #f87171; }
     .wave { color: #38bdf8; }
+    .wave-timer {
+      color: #a5f3fc;
+      font-size: 11px;
+      background: #1e293b;
+      padding: 3px 6px;
+      border-radius: 5px;
+      border: 1px solid #334155;
+    }
     .top-btns {
       display: flex;
-      gap: 5px;
+      align-items: center;
+      gap: 6px;
     }
     button.mini-btn {
       background: #1e293b;
       color: #e2e8f0;
       border: 1px solid #334155;
       border-radius: 6px;
-      padding: 5px 8px;
+      padding: 5px 10px;
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
@@ -75,10 +84,10 @@
       border-color: #38bdf8;
       color: #fff;
     }
-    button.mini-btn.reset {
-      background: #3f1d2e;
-      border-color: #be123c;
-      color: #fda4af;
+    button.mini-btn.paused {
+      background: #d97706;
+      border-color: #fbbf24;
+      color: #fff;
     }
 
     /* 게임 캔버스 영역 */
@@ -243,9 +252,12 @@
 <body>
 
   <div id="hud">
-    <div class="stat wave">W<span id="ui-wave">1</span></div>
-    <!-- 골드 터치 시 +1000G 치트 -->
-    <div class="stat gold cheat-btn" id="cheat-gold" title="터치 시 +1000 골드">
+    <div class="stat wave">
+      W<span id="ui-wave">1</span>
+      <span class="wave-timer" id="ui-wave-status">대기</span>
+    </div>
+    <!-- 골드 터치 시 +10000G 치트 -->
+    <div class="stat gold cheat-btn" id="cheat-gold" title="터치 시 +10000 골드">
       💰<span id="ui-gold">220</span>
       <span class="income">(+<span id="ui-income">2</span>/s)</span>
     </div>
@@ -255,8 +267,7 @@
     </div>
     <div class="top-btns">
       <button class="mini-btn" id="btn-speed">1x</button>
-      <button class="mini-btn" id="btn-wave">웨이브 시작</button>
-      <button class="mini-btn reset" id="btn-reset" title="초기화">↺</button>
+      <button class="mini-btn" id="btn-pause">⏸ 일시정지</button>
     </div>
   </div>
 
@@ -264,7 +275,7 @@
     <canvas id="canvas"></canvas>
     <div id="overlay">
       <h1 id="ov-title">NEON DEFENSE</h1>
-      <p id="ov-desc">자동 저장 지원!<br>상단 💰골드(+1000)나 ❤️생명(+1)을 터치하면 치트가 발동됩니다.</p>
+      <p id="ov-desc">웨이브 클리어 5초 후 다음 단계가 자동 시작됩니다!<br>상단 💰골드(+10,000)나 ❤️생명(+1)을 터치하면 치트가 발동됩니다.</p>
       <div class="ov-btns">
         <button class="ov-btn" id="continue-btn">이어하기</button>
         <button class="ov-btn" id="start-btn">새 게임 시작</button>
@@ -349,6 +360,7 @@
     let wave = 1;
     let gameSpeed = 1;
     let isRunning = false;
+    let isPaused = false;
     let selectedBuildType = 'blaster';
     let selectedTower = null;
 
@@ -364,6 +376,7 @@
     let floatingTexts = [];
 
     let waveInProgress = false;
+    let nextWaveCountdown = 5.0; // 5초 뒤 자동 웨이브 타이머
     let spawnQueue = 0;
     let spawnTimer = 0;
     let spawnInterval = 0.6;
@@ -374,7 +387,6 @@
       cellSize = Math.floor(Math.min(maxW / COLS, maxH / ROWS));
       canvas.width = cellSize * COLS;
       canvas.height = cellSize * ROWS;
-      // 화면 크기 변경 시 타워 픽셀 좌표 재계산
       towers.forEach(t => {
         t.x = (t.c + 0.5) * cellSize;
         t.y = (t.r + 0.5) * cellSize;
@@ -385,6 +397,7 @@
 
     // UI 요소
     const uiWave = document.getElementById('ui-wave');
+    const uiWaveStatus = document.getElementById('ui-wave-status');
     const uiGold = document.getElementById('ui-gold');
     const uiIncome = document.getElementById('ui-income');
     const uiLife = document.getElementById('ui-life');
@@ -396,8 +409,7 @@
     const cheatGoldBtn = document.getElementById('cheat-gold');
     const cheatLifeBtn = document.getElementById('cheat-life');
     const btnSpeed = document.getElementById('btn-speed');
-    const btnWave = document.getElementById('btn-wave');
-    const btnReset = document.getElementById('btn-reset');
+    const btnPause = document.getElementById('btn-pause');
     const buildBar = document.getElementById('build-bar');
     const upgradeBar = document.getElementById('upgrade-bar');
     const btnUpgrade = document.getElementById('btn-upgrade');
@@ -439,7 +451,6 @@
       }
     }
 
-    // 로컬 스토리지 불러오기 확인
     function checkSavedGame() {
       try {
         const raw = localStorage.getItem(SAVE_KEY);
@@ -465,7 +476,6 @@
       continueBtn.style.display = 'none';
     }
 
-    // 사파리 탭 닫기/전환 시 자동 저장
     window.addEventListener('pagehide', saveGame);
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') saveGame();
@@ -481,23 +491,31 @@
 
     function updateHUD() {
       uiWave.textContent = wave;
-      uiGold.textContent = gold;
+      if (waveInProgress) {
+        uiWaveStatus.textContent = '진행중';
+      } else {
+        uiWaveStatus.textContent = `다음: ${Math.ceil(nextWaveCountdown)}s`;
+      }
+
+      uiGold.textContent = gold.toLocaleString();
       uiIncome.textContent = goldPerSec;
       uiLife.textContent = life;
 
       const mCost = getMineUpgradeCost();
       uiMineLv.textContent = mineLevel;
       uiMineRate.textContent = goldPerSec;
-      uiMineCost.textContent = mCost;
+      uiMineCost.textContent = mCost.toLocaleString();
       mineBtn.disabled = gold < mCost;
 
-      btnWave.style.opacity = waveInProgress ? '0.4' : '1';
+      btnPause.textContent = isPaused ? '▶ 계속' : '⏸ 일시정지';
+      btnPause.classList.toggle('paused', isPaused);
+
       if (selectedTower) {
         const upgCost = getUpgradeCost(selectedTower);
         const sellVal = Math.floor(selectedTower.totalInvested * 0.75);
-        btnUpgrade.textContent = `강화 Lv.${selectedTower.level + 1} (💰${upgCost})`;
+        btnUpgrade.textContent = `강화 Lv.${selectedTower.level + 1} (💰${upgCost.toLocaleString()})`;
         btnUpgrade.disabled = gold < upgCost;
-        btnSell.textContent = `판매 (+💰${sellVal})`;
+        btnSell.textContent = `판매 (+💰${sellVal.toLocaleString()})`;
       }
     }
 
@@ -519,11 +537,11 @@
       }
     }
 
-    // 치트키 이벤트 (+1000 골드 / +1 생명)
+    // 치트키 이벤트 (+10,000 골드 / +1 생명)
     cheatGoldBtn.addEventListener('click', () => {
       if (!isRunning) return;
-      gold += 1000;
-      addFloatingText(canvas.width / 2, 30, 'CHEAT: +1,000G!', '#fbbf24');
+      gold += 10000;
+      addFloatingText(canvas.width / 2, 35, 'CHEAT: +10,000G!', '#fbbf24');
       updateHUD();
       saveGame();
     });
@@ -531,7 +549,7 @@
     cheatLifeBtn.addEventListener('click', () => {
       if (!isRunning) return;
       life += 1;
-      addFloatingText(canvas.width / 2, 30, 'CHEAT: +1 ❤️!', '#f87171');
+      addFloatingText(canvas.width / 2, 35, 'CHEAT: +1 ❤️!', '#f87171');
       updateHUD();
       saveGame();
     });
@@ -692,13 +710,11 @@
       saveGame();
     });
 
-    btnWave.addEventListener('click', startWave);
-
-    // 상단 초기화(↺) 버튼
-    btnReset.addEventListener('click', () => {
-      if (!confirm('현재 진행 데이터를 초기화하고 처음부터 다시 시작할까요?')) return;
-      clearSavedGame();
-      startNewGame();
+    // 일시정지 버튼 이벤트
+    btnPause.addEventListener('click', () => {
+      if (!isRunning) return;
+      isPaused = !isPaused;
+      updateHUD();
     });
 
     function startNewGame() {
@@ -715,6 +731,8 @@
       particles = [];
       floatingTexts = [];
       waveInProgress = false;
+      nextWaveCountdown = 5.0;
+      isPaused = false;
       closeUpgradeBar();
       isRunning = true;
       overlay.classList.add('hidden');
@@ -745,6 +763,8 @@
       particles = [];
       floatingTexts = [];
       waveInProgress = false;
+      nextWaveCountdown = 5.0;
+      isPaused = false;
 
       towers = (saved.towers || []).map(t => ({
         ...t,
@@ -758,7 +778,7 @@
       isRunning = true;
       overlay.classList.add('hidden');
       updateHUD();
-      addFloatingText(canvas.width / 2, canvas.height / 2, `WAVE ${wave} 불러오기 완료!`, '#34d399');
+      addFloatingText(canvas.width / 2, canvas.height / 2, `WAVE ${wave} 불러오기 완료! (5초 후 시작)`, '#34d399');
     });
 
     startBtn.addEventListener('click', () => {
@@ -768,8 +788,24 @@
       startNewGame();
     });
 
-    function update(dt) {
-      if (!isRunning) return;
+    function updateVisualEffects(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.life -= dt;
+        if (pt.life <= 0) particles.splice(i, 1);
+      }
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y -= 22 * dt;
+        ft.life -= dt;
+        if (ft.life <= 0) floatingTexts.splice(i, 1);
+      }
+    }
+
+    function updateGameLogic(dt) {
+      if (!isRunning || isPaused) return;
 
       // 초당 자동 골드 생산
       if (waveInProgress) {
@@ -793,9 +829,10 @@
           }
         } else if (enemies.length === 0) {
           waveInProgress = false;
+          nextWaveCountdown = 5.0; // 클리어 후 5초 타이머 시작
           const bonus = 30 + wave * 8;
           gold += bonus;
-          addFloatingText(canvas.width / 2, canvas.height / 2, `WAVE ${wave} 클리어! +${bonus}G (자동저장됨)`, '#38bdf8');
+          addFloatingText(canvas.width / 2, canvas.height / 2, `WAVE ${wave} 클리어! +${bonus}G`, '#38bdf8');
           wave++;
           updateHUD();
           saveGame();
@@ -921,20 +958,6 @@
           p.y += (dy / dist) * p.speed * dt;
         }
       }
-
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const pt = particles[i];
-        pt.x += pt.vx;
-        pt.y += pt.vy;
-        pt.life -= dt;
-        if (pt.life <= 0) particles.splice(i, 1);
-      }
-      for (let i = floatingTexts.length - 1; i >= 0; i--) {
-        const ft = floatingTexts[i];
-        ft.y -= 22 * dt;
-        ft.life -= dt;
-        if (ft.life <= 0) floatingTexts.splice(i, 1);
-      }
     }
 
     function draw() {
@@ -1047,19 +1070,46 @@
         ctx.fillText(ft.text, ft.x, ft.y);
       }
       ctx.globalAlpha = 1;
+
+      // 일시정지 배너 표시
+      if (isRunning && isPaused) {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.55)';
+        ctx.fillRect(0, canvas.height / 2 - 28, canvas.width, 56);
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⏸ 일시정지 중 (타워 건설/강화 가능)', canvas.width / 2, canvas.height / 2 + 6);
+      }
     }
 
-    // 초기 진입 시 저장된 게임 확인
     checkSavedGame();
 
     let lastTime = performance.now();
     function loop(now) {
       const rawDt = Math.min(0.05, (now - lastTime) / 1000);
       lastTime = now;
-      const stepDt = rawDt;
-      for (let s = 0; s < gameSpeed; s++) {
-        update(stepDt);
+
+      // 웨이브 대기 중 5초 카운트다운 (배속과 무관하게 실제 시간 5초로 작동)
+      if (isRunning && !isPaused && !waveInProgress) {
+        const prevSec = Math.ceil(nextWaveCountdown);
+        nextWaveCountdown -= rawDt;
+        if (nextWaveCountdown <= 0) {
+          startWave();
+        } else if (Math.ceil(nextWaveCountdown) !== prevSec) {
+          updateHUD();
+        }
       }
+
+      // 전투 및 이동 연산 (배속 적용)
+      if (isRunning && !isPaused) {
+        for (let s = 0; s < gameSpeed; s++) {
+          updateGameLogic(rawDt);
+        }
+      }
+
+      // 파티클 및 텍스트 이펙트는 일시정지 중에도 자연스럽게 표시
+      updateVisualEffects(rawDt);
+
       draw();
       requestAnimationFrame(loop);
     }
