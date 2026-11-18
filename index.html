@@ -28,19 +28,20 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 14px;
+      padding: 10px 12px;
       background: #111827;
       border-bottom: 1px solid #1e293b;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       flex-shrink: 0;
     }
     .stat {
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
     }
     .gold { color: #fbbf24; }
+    .income { color: #34d399; font-size: 11px; font-weight: 600; }
     .life { color: #f87171; }
     .wave { color: #38bdf8; }
     .top-btns {
@@ -52,7 +53,7 @@
       color: #e2e8f0;
       border: 1px solid #334155;
       border-radius: 6px;
-      padding: 5px 10px;
+      padding: 5px 9px;
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
@@ -70,7 +71,7 @@
       justify-content: center;
       align-items: center;
       position: relative;
-      padding: 8px;
+      padding: 6px;
       overflow: hidden;
     }
     canvas {
@@ -122,12 +123,35 @@
     #controls {
       background: #111827;
       border-top: 1px solid #1e293b;
-      padding: 10px 12px 16px;
+      padding: 8px 12px 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       flex-shrink: 0;
     }
+    /* 채굴기 투자 바 */
+    #mine-btn {
+      width: 100%;
+      background: linear-gradient(90deg, #064e3b, #0f172a);
+      border: 1px solid #10b981;
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: #ecfdf5;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #mine-btn:active { transform: scale(0.98); }
+    #mine-btn:disabled {
+      opacity: 0.5;
+      border-color: #334155;
+      background: #1e293b;
+    }
+    .mine-cost { color: #fbbf24; }
+
     .tower-bar {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -137,11 +161,11 @@
       background: #1e293b;
       border: 2px solid #334155;
       border-radius: 10px;
-      padding: 8px 6px;
+      padding: 6px 4px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
       cursor: pointer;
       transition: transform 0.1s;
     }
@@ -155,7 +179,7 @@
       font-weight: 700;
     }
     .tower-card .desc {
-      font-size: 11px;
+      font-size: 10px;
       color: #94a3b8;
     }
     .tower-card .cost {
@@ -190,8 +214,11 @@
 
   <div id="hud">
     <div class="stat wave">WAVE <span id="ui-wave">1</span></div>
-    <div class="stat gold">💰 <span id="ui-gold">120</span></div>
-    <div class="stat life">❤️ <span id="ui-life">15</span></div>
+    <div class="stat gold">
+      💰 <span id="ui-gold">220</span>
+      <span class="income">(+<span id="ui-income">2</span>/s)</span>
+    </div>
+    <div class="stat life">❤️ <span id="ui-life">20</span></div>
     <div class="top-btns">
       <button class="mini-btn" id="btn-speed">1x</button>
       <button class="mini-btn" id="btn-wave">다음 웨이브</button>
@@ -202,12 +229,18 @@
     <canvas id="canvas"></canvas>
     <div id="overlay">
       <h1 id="ov-title">NEON DEFENSE</h1>
-      <p id="ov-desc">빈 칸을 터치해 타워를 건설하고<br>설치된 타워를 터치해 업그레이드하세요.</p>
+      <p id="ov-desc">빈 칸을 터치해 타워를 건설하고<br>채굴기에 투자해 초당 골드 수입을 늘리세요!</p>
       <button id="start-btn">게임 시작</button>
     </div>
   </div>
 
   <div id="controls">
+    <!-- 초당 골드 채굴기 업그레이드 버튼 -->
+    <button id="mine-btn">
+      <span>⛏️ 골드 채굴기 Lv.<span id="ui-mine-lv">1</span> (초당 +<span id="ui-mine-rate">2</span>G)</span>
+      <span class="mine-cost">투자 💰 <span id="ui-mine-cost">60</span></span>
+    </button>
+
     <!-- 타워 건설 선택 -->
     <div class="tower-bar" id="build-bar">
       <div class="tower-card selected" data-type="blaster">
@@ -217,13 +250,13 @@
       </div>
       <div class="tower-card" data-type="frost">
         <span class="name" style="color:#a5f3fc;">❄ 프로스트</span>
-        <span class="desc">적 이동속도 45% 감소</span>
-        <span class="cost">💰 75</span>
+        <span class="desc">이동속도 45% 감소</span>
+        <span class="cost">💰 70</span>
       </div>
       <div class="tower-card" data-type="sniper">
         <span class="name" style="color:#f472b6;">▲ 레이저</span>
-        <span class="desc">초장거리 / 강력한 한방</span>
-        <span class="cost">💰 100</span>
+        <span class="desc">초장거리 / 고화력</span>
+        <span class="cost">💰 95</span>
       </div>
     </div>
 
@@ -240,12 +273,10 @@
     const ctx = canvas.getContext('2d');
     const wrap = document.getElementById('game-wrap');
 
-    // 그리드 설정 (10열 x 12행 세로 비율)
     const COLS = 10;
     const ROWS = 12;
     let cellSize = 32;
 
-    // 웨이포인트 (그리드 좌표)
     const WAYPOINTS = [
       { c: 0, r: 1 }, { c: 8, r: 1 },
       { c: 8, r: 4 }, { c: 1, r: 4 },
@@ -254,7 +285,6 @@
       { c: 2, r: 11 }
     ];
 
-    // 길 타일 맵 생성
     const pathSet = new Set();
     for (let i = 0; i < WAYPOINTS.length - 1; i++) {
       const a = WAYPOINTS[i];
@@ -268,21 +298,26 @@
       }
     }
 
-    // 타워 스펙
+    // 타워 스펙 (상향 조정)
     const TOWER_TYPES = {
-      blaster: { name: '블래스터', cost: 50, range: 2.6, damage: 18, cooldown: 0.45, color: '#38bdf8', projSpeed: 9, slow: 0 },
-      frost:   { name: '프로스트', cost: 75, range: 2.4, damage: 10, cooldown: 0.75, color: '#67e8f9', projSpeed: 8, slow: 0.45 },
-      sniper:  { name: '레이저',   cost: 100, range: 4.5, damage: 65, cooldown: 1.35, color: '#f472b6', projSpeed: 15, slow: 0 }
+      blaster: { name: '블래스터', cost: 50, range: 2.7, damage: 22, cooldown: 0.42, color: '#38bdf8', projSpeed: 9, slow: 0 },
+      frost:   { name: '프로스트', cost: 70, range: 2.5, damage: 12, cooldown: 0.70, color: '#67e8f9', projSpeed: 8, slow: 0.45 },
+      sniper:  { name: '레이저',   cost: 95, range: 4.6, damage: 75, cooldown: 1.25, color: '#f472b6', projSpeed: 15, slow: 0 }
     };
 
     // 게임 상태
-    let gold = 120;
-    let life = 15;
+    let gold = 220;
+    let life = 20;
     let wave = 1;
     let gameSpeed = 1;
     let isRunning = false;
     let selectedBuildType = 'blaster';
     let selectedTower = null;
+
+    // 골드 채굴기 상태
+    let mineLevel = 1;
+    let goldPerSec = 2;
+    let mineAccumulator = 0;
 
     let towers = [];
     let enemies = [];
@@ -290,16 +325,14 @@
     let particles = [];
     let floatingTexts = [];
 
-    // 웨이브 관리
     let waveInProgress = false;
     let spawnQueue = 0;
     let spawnTimer = 0;
-    let spawnInterval = 0.75;
+    let spawnInterval = 0.8;
 
-    // 캔버스 크기 반응형 조정
     function resizeCanvas() {
-      const maxW = wrap.clientWidth - 16;
-      const maxH = wrap.clientHeight - 16;
+      const maxW = wrap.clientWidth - 12;
+      const maxH = wrap.clientHeight - 12;
       cellSize = Math.floor(Math.min(maxW / COLS, maxH / ROWS));
       canvas.width = cellSize * COLS;
       canvas.height = cellSize * ROWS;
@@ -310,7 +343,13 @@
     // UI 요소
     const uiWave = document.getElementById('ui-wave');
     const uiGold = document.getElementById('ui-gold');
+    const uiIncome = document.getElementById('ui-income');
     const uiLife = document.getElementById('ui-life');
+    const uiMineLv = document.getElementById('ui-mine-lv');
+    const uiMineRate = document.getElementById('ui-mine-rate');
+    const uiMineCost = document.getElementById('ui-mine-cost');
+    const mineBtn = document.getElementById('mine-btn');
+
     const btnSpeed = document.getElementById('btn-speed');
     const btnWave = document.getElementById('btn-wave');
     const buildBar = document.getElementById('build-bar');
@@ -321,22 +360,34 @@
     const overlay = document.getElementById('overlay');
     const startBtn = document.getElementById('start-btn');
 
+    function getMineUpgradeCost() {
+      return Math.floor(60 * Math.pow(1.45, mineLevel - 1));
+    }
+
+    function getUpgradeCost(t) {
+      return Math.floor(t.baseCost * Math.pow(1.4, t.level));
+    }
+
     function updateHUD() {
       uiWave.textContent = wave;
       uiGold.textContent = gold;
+      uiIncome.textContent = goldPerSec;
       uiLife.textContent = life;
+
+      const mCost = getMineUpgradeCost();
+      uiMineLv.textContent = mineLevel;
+      uiMineRate.textContent = goldPerSec;
+      uiMineCost.textContent = mCost;
+      mineBtn.disabled = gold < mCost;
+
       btnWave.style.opacity = waveInProgress ? '0.4' : '1';
       if (selectedTower) {
         const upgCost = getUpgradeCost(selectedTower);
-        const sellVal = Math.floor(selectedTower.totalInvested * 0.7);
+        const sellVal = Math.floor(selectedTower.totalInvested * 0.75);
         btnUpgrade.textContent = selectedTower.level >= 5 ? 'MAX 레벨' : `강화 Lv.${selectedTower.level + 1} (💰${upgCost})`;
         btnUpgrade.disabled = selectedTower.level >= 5 || gold < upgCost;
         btnSell.textContent = `판매 (+💰${sellVal})`;
       }
-    }
-
-    function getUpgradeCost(t) {
-      return Math.floor(t.baseCost * Math.pow(1.45, t.level));
     }
 
     function addFloatingText(x, y, text, color = '#fff') {
@@ -357,23 +408,36 @@
       }
     }
 
+    // 채굴기 투자 이벤트
+    mineBtn.addEventListener('click', () => {
+      if (!isRunning) return;
+      const cost = getMineUpgradeCost();
+      if (gold < cost) return;
+      gold -= cost;
+      mineLevel++;
+      goldPerSec += 2 + Math.floor(mineLevel * 0.5);
+      addFloatingText(canvas.width / 2, canvas.height - 30, `채굴기 Lv.${mineLevel}! (+${goldPerSec}G/s)`, '#34d399');
+      updateHUD();
+    });
+
     // 웨이브 시작
     function startWave() {
       if (waveInProgress || !isRunning) return;
       waveInProgress = true;
       const isBoss = wave % 5 === 0;
-      spawnQueue = isBoss ? 4 : 6 + Math.floor(wave * 1.5);
-      spawnInterval = isBoss ? 1.2 : Math.max(0.32, 0.8 - wave * 0.03);
+      spawnQueue = isBoss ? 3 : 5 + Math.floor(wave * 1.4);
+      spawnInterval = isBoss ? 1.3 : Math.max(0.35, 0.85 - wave * 0.025);
       spawnTimer = 0;
       updateHUD();
     }
 
+    // 적 스폰 (난이도 완화 적용)
     function spawnEnemy() {
       const isBoss = wave % 5 === 0;
-      const baseHp = 45 * Math.pow(1.26, wave - 1);
-      const hp = isBoss ? baseHp * 3.8 : baseHp;
-      const speed = isBoss ? 1.15 : Math.min(2.8, 1.45 + wave * 0.04);
-      const reward = isBoss ? 35 + wave * 3 : 10 + Math.floor(wave * 1.2);
+      const baseHp = 32 * Math.pow(1.20, wave - 1);
+      const hp = isBoss ? baseHp * 3.4 : baseHp;
+      const speed = isBoss ? 1.05 : Math.min(2.5, 1.3 + wave * 0.035);
+      const reward = isBoss ? 40 + wave * 4 : 11 + Math.floor(wave * 1.3);
 
       enemies.push({
         wpIndex: 0,
@@ -390,7 +454,6 @@
       });
     }
 
-    // 타워 선택 / 건설 터치 이벤트
     canvas.addEventListener('pointerdown', (e) => {
       if (!isRunning) return;
       const rect = canvas.getBoundingClientRect();
@@ -401,7 +464,6 @@
 
       if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return;
 
-      // 기존 타워 확인
       const existing = towers.find(t => t.c === c && t.r === r);
       if (existing) {
         selectedTower = existing;
@@ -411,19 +473,16 @@
         return;
       }
 
-      // 빈 칸 클릭 시 업그레이드 창 닫기
       if (selectedTower) {
         closeUpgradeBar();
         return;
       }
 
-      // 길 위에는 건설 불가
       if (pathSet.has(`${c},${r}`)) {
         addFloatingText((c + 0.5) * cellSize, (r + 0.5) * cellSize, '건설 불가', '#f87171');
         return;
       }
 
-      // 신규 타워 건설
       const spec = TOWER_TYPES[selectedBuildType];
       if (gold < spec.cost) {
         addFloatingText((c + 0.5) * cellSize, (r + 0.5) * cellSize, '골드 부족!', '#fbbf24');
@@ -458,7 +517,6 @@
       buildBar.style.display = 'grid';
     }
 
-    // 하단 버튼 이벤트
     document.querySelectorAll('.tower-card').forEach(card => {
       card.addEventListener('click', () => {
         document.querySelectorAll('.tower-card').forEach(c => c.classList.remove('selected'));
@@ -474,7 +532,7 @@
       gold -= cost;
       selectedTower.totalInvested += cost;
       selectedTower.level++;
-      selectedTower.damage = Math.round(selectedTower.damage * 1.42);
+      selectedTower.damage = Math.round(selectedTower.damage * 1.45);
       selectedTower.range += 0.22;
       selectedTower.cooldown *= 0.92;
       spawnParticles(selectedTower.x, selectedTower.y, '#34d399', 10);
@@ -484,7 +542,7 @@
 
     btnSell.addEventListener('click', () => {
       if (!selectedTower) return;
-      const refund = Math.floor(selectedTower.totalInvested * 0.7);
+      const refund = Math.floor(selectedTower.totalInvested * 0.75);
       gold += refund;
       spawnParticles(selectedTower.x, selectedTower.y, '#f87171', 8);
       addFloatingText(selectedTower.x, selectedTower.y, `+${refund}G`, '#fbbf24');
@@ -504,9 +562,12 @@
     btnWave.addEventListener('click', startWave);
 
     startBtn.addEventListener('click', () => {
-      gold = 120;
-      life = 15;
+      gold = 220;
+      life = 20;
       wave = 1;
+      mineLevel = 1;
+      goldPerSec = 2;
+      mineAccumulator = 0;
       towers = [];
       enemies = [];
       projectiles = [];
@@ -520,9 +581,18 @@
       startWave();
     });
 
-    // 메인 업데이트 루프
     function update(dt) {
       if (!isRunning) return;
+
+      // 초당 자동 골드 생산 (웨이브 진행 중일 때 작동)
+      if (waveInProgress) {
+        mineAccumulator += dt;
+        if (mineAccumulator >= 1.0) {
+          mineAccumulator -= 1.0;
+          gold += goldPerSec;
+          updateHUD();
+        }
+      }
 
       // 적 스폰
       if (waveInProgress) {
@@ -535,7 +605,7 @@
           }
         } else if (enemies.length === 0) {
           waveInProgress = false;
-          const bonus = 20 + wave * 5;
+          const bonus = 25 + wave * 6;
           gold += bonus;
           addFloatingText(canvas.width / 2, canvas.height / 2, `WAVE ${wave} 클리어! +${bonus}G`, '#38bdf8');
           wave++;
@@ -650,7 +720,6 @@
         }
       }
 
-      // 파티클 및 플로팅 텍스트
       for (let i = particles.length - 1; i >= 0; i--) {
         const pt = particles[i];
         pt.x += pt.vx;
@@ -666,11 +735,9 @@
       }
     }
 
-    // 렌더링
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 그리드 배경
       for (let c = 0; c < COLS; c++) {
         for (let r = 0; r < ROWS; r++) {
           const isPath = pathSet.has(`${c},${r}`);
@@ -682,7 +749,6 @@
         }
       }
 
-      // 경로 중심선 표시
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
       ctx.lineWidth = cellSize * 0.22;
       ctx.lineCap = 'round';
@@ -696,7 +762,6 @@
       });
       ctx.stroke();
 
-      // 시작점 & 기지 표시
       ctx.fillStyle = '#22c55e';
       ctx.beginPath();
       ctx.arc((WAYPOINTS[0].c + 0.5) * cellSize, (WAYPOINTS[0].r + 0.5) * cellSize, cellSize * 0.25, 0, Math.PI * 2);
@@ -708,7 +773,6 @@
       ctx.arc((lastWp.c + 0.5) * cellSize, (lastWp.r + 0.5) * cellSize, cellSize * 0.3, 0, Math.PI * 2);
       ctx.fill();
 
-      // 선택된 타워 사거리 표시
       if (selectedTower) {
         ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
         ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
@@ -719,36 +783,30 @@
         ctx.stroke();
       }
 
-      // 타워 그리기
       for (const t of towers) {
         ctx.save();
         ctx.translate(t.x, t.y);
 
-        // 받침대
         ctx.fillStyle = '#334155';
         ctx.beginPath();
         ctx.arc(0, 0, cellSize * 0.38, 0, Math.PI * 2);
         ctx.fill();
 
-        // 포신 회전
         ctx.rotate(t.angle);
         ctx.fillStyle = t.color;
         ctx.fillRect(0, -cellSize * 0.09, cellSize * 0.42, cellSize * 0.18);
 
-        // 본체
         ctx.beginPath();
         ctx.arc(0, 0, cellSize * 0.26, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
-        // 레벨 점 표시
         ctx.fillStyle = '#fff';
         ctx.font = `bold ${Math.max(10, Math.floor(cellSize * 0.28))}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillText(`L${t.level}`, t.x, t.y + cellSize * 0.44);
       }
 
-      // 적 그리기
       for (const e of enemies) {
         const radius = e.isBoss ? cellSize * 0.36 : cellSize * 0.24;
         ctx.fillStyle = e.slowTimer > 0 ? '#67e8f9' : (e.isBoss ? '#f59e0b' : '#f43f5e');
@@ -756,7 +814,6 @@
         ctx.arc(e.x, e.y, radius, 0, Math.PI * 2);
         ctx.fill();
 
-        // 체력바
         const barW = radius * 2.2;
         const barH = 4;
         const hpRatio = Math.max(0, e.hp / e.maxHp);
@@ -766,7 +823,6 @@
         ctx.fillRect(e.x - barW / 2, e.y - radius - 8, barW * hpRatio, barH);
       }
 
-      // 투사체
       for (const p of projectiles) {
         ctx.fillStyle = p.color;
         ctx.beginPath();
@@ -774,7 +830,6 @@
         ctx.fill();
       }
 
-      // 파티클
       for (const pt of particles) {
         ctx.globalAlpha = Math.max(0, pt.life * 2);
         ctx.fillStyle = pt.color;
@@ -782,7 +837,6 @@
       }
       ctx.globalAlpha = 1;
 
-      // 플로팅 텍스트
       for (const ft of floatingTexts) {
         ctx.globalAlpha = Math.min(1, ft.life * 1.5);
         ctx.fillStyle = ft.color;
@@ -805,3 +859,4 @@
   </script>
 </body>
 </html>
+
